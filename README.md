@@ -1,161 +1,173 @@
 # Ethereum Workshop - Introduction to Ethereum
 
-## 1. Setting up Ethereum
+## 2. Interacting with the Ethereum Node
 
-### 1.1. Install an Ethereum node
+### 2.1. Mist Browser and Ethereum Wallet
 
-Install geth
+Mist is an Ethereum browser which already includes the Ethereum Wallet embedded.
 
-Info: [Installing Geth · ethereum/go-ethereum Wiki · GitHub](https://github.com/ethereum/go-ethereum/wiki/Installing-Geth)
+![Mist Browser Screenshot](images/mist.png?raw=true "Mist")
 
-For MacOs users:
+Download and install Mist from [Releases · ethereum/mist · GitHub](https://github.com/ethereum/mist/releases).
 
-```
-brew tap ethereum/ethereum
-brew install ethereum
-```
+Important: if not otherwise specified, Mist tries to synchronize with the Ethereum main network, i.e. download the entire blockchain.
 
-URL:
-[Installation Instructions for Mac · ethereum/go-ethereum Wiki · GitHub](https://github.com/ethereum/go-ethereum/wiki/Installation-Instructions-for-Mac)
-
-Test the installation and check geth version (1.8.4-stable):
+In order to open it directly connected to the development network by providing the IPC path:
 
 ```
-geth version
+open -a /Applications/Mist.app --args --rpc <FULL_PATH>/chaindata/geth.ipc
 ```
 
-### 1.2. Setting up your own Private Ethereum Network
+It is important to provide the `<FULL_PATH>`or otherwise it will not connect to the private ethereum network.
 
-Create the first blockchain block, called _Genesis_, and save it under `genesis.json`:
+Discover the application:
 
-```
-{
-    "config": {
-        "chainId": 12342,
-        "homesteadBlock": 0,
-        "eip155Block": 0,
-        "eip158Block": 0
-    },
-    "difficulty": "0x400",
-    "gasLimit": "0x2100000",
-    "alloc": {}
-}
-```
+* Check your pre-funded account balance
+* Create a new account (not wallet contract)
+* Send ETH to the new account
 
-Script to generate genesis blocks can be found [here](https://raw.githubusercontent.com/ethereum/genesis_block_generator/master/mk_genesis_block.py).
+Wait... why is it not working?
+We forgot something really important... mining!
 
-Notice that we added a low difficulty for testing purposes.
-More info about the parameters can be found [here](https://ethereum.stackexchange.com/questions/2376/what-does-each-genesis-json-parameter-mean).
+### 2.2. Enabling mining in the Ethereum node
 
-Initialize the genesis block as and store all blockchain data into the folder _chaindata_:
+Access the Ethereum node and enable mining:
 
 ```
-geth --networkid 12342 --datadir ./chaindata init ./genesis.json
+geth attach ./chaindata/geth.ipc
 ```
 
-### 1.3. Pre-allocating ether to your account
-
-To ease the access to the private blockchain, accounts can be pre-founded in the genesis block.
-
-Create an account for pre-funding by using geth as:
+The pending transactions in the node can be reviewd by:
 
 ```
-geth account new --datadir ./chaindata
-
-Your new account is locked with a password. Please give a password. Do not forget this password.
-Passphrase:
-Repeat passphrase:
-Address: {34ea76abaae5f9c4fef8bc8195632ec92be437df}
+txpool.status
+txpool.content
 ```
 
-The account keys are stored in chaindata/keystore.
-
-Update the genesis.json by setting the **alloc** field with the previously created account address:
+As it can be seen, there are pending transactions. To enable mining, just type:
 
 ```
-{
-    "config": {
-        "chainId": 15,
-        "homesteadBlock": 0,
-        "eip155Block": 0,
-        "eip158Block": 0
-    },
-    "difficulty": "0x400",
-    "gasLimit": "0x2100000",
-    "alloc": {
-        "34ea76abaae5f9c4fef8bc8195632ec92be437df":
-         { "balance": "100000000000000000000" }
+miner.start()
+```
+
+If etherbase is not set, then:
+
+```
+miner.setEtherbase("0x34ea76abaae5f9c4fef8bc8195632ec92be437df")
+```
+
+It can be stopped anytime by:
+
+```
+miner.stop();
+```
+
+Now, the previous transfer should be executed!
+
+Question: Did you notice anything regarding the number of confirmations?
+
+### 2.3. Deploying Smart Contracts
+
+Now, it's time to deploy small Smart Contracts by using Mist.
+
+Note: "Wallet Contracts" are Smart Contracts provided by the application.
+
+#### Greeter
+
+In the "Contracts" section, deploy a new Smart Contract.
+
+Paste the following code into the Solidity Contract Source Code editor.
+
+```
+pragma solidity ^0.4.18;
+
+contract Greeter {
+
+    /* Define variable greeting of the type string */
+    string greeting;
+
+    /* This runs when the contract is executed */
+    function Greeter(string _greeting) public {
+        greeting = _greeting;
+    }
+
+    /* Main function */
+    function greet() public constant returns (string) {
+        return greeting;
     }
 }
 ```
 
-Note: the balance is defined in **Wei**, which is a denomination (just as a _cent_ or _penny_). 1 ether = 10^18 wei.
+Select the contract to deploy (there is only 1) and write the constructor arguments, e.g. "Ahoy, matey!".
 
-As you may notice, the chaindata folder already contains data from the previous initialization. Therefore, remove the previous initialized chaindata:
+After deployed, the contract will have a function that returns the configured greeting.
 
-```
-geth removedb --datadir ./chaindata
-```
+#### Hello World
 
-Re-run the init command:
+The previous Smart Contract was so simple, that there was only 1 function accessible.
 
-```
-geth --networkid 12342 --datadir ./chaindata init ./genesis.json
-```
-
-### 1.4. Running an Ethereum Node
-
-Run the Ethereum node:
+The following Smart Contract is also simple, but allows to modify a counter by using 2 functions (to add and substract) and 1 to read.
 
 ```
-geth --identity "MyTestNetNode" --datadir ./chaindata --nodiscover --networkid 12342
+pragma solidity ^0.4.18;
+
+contract HelloWorld {
+
+    //state variable we assigned earlier
+    uint256 counter = 5;
+
+    //increases counter by 1
+    function add() public {  
+        counter++;
+    }
+
+    //decreases counter by 1
+    function subtract() public {
+        counter--;
+    }
+
+    //read the counter
+    function read() public constant returns (uint256) {
+        return counter;
+    }
+}
 ```
 
-### 1.5. Interacting through the console
+This contract allows users to interact with the Smart Contract by writing into it and modifying the counter value.
 
-Attach to the Ethereum node by using IPC (Inter-process Communications):
+Try it out by going to the _Contracts_ section and executing some of the previous functions to modify the counter.
 
-```
-geth attach ./chaindata/geth.ipc
+### 2.4. Metamask
 
-Welcome to the Geth JavaScript console!
+One of the most used application to interact with Ethereum is Metamask.
 
-instance: Geth/MyTestNetNode/v1.8.4-stable/darwin-amd64/go1.10.1
-coinbase: 0xe73f4d6cbd66ae26bd03cb208df78484e8255d72
-at block: 0 (Thu, 01 Jan 1970 01:00:00 CET)
- datadir: /Users/mariocao/Data/Personal/git/ethereum-basic-workshop/section-1/chaindata
- modules: admin:1.0 debug:1.0 eth:1.0 miner:1.0 net:1.0 personal:1.0 rpc:1.0 txpool:1.0 web3:1.0
+![Metamak Screenshot](images/metamask.png?raw=true "Metamask")
 
->
-```
+Install [MetaMask](https://metamask.io/) browser extension (for Chrome, Firefox and Opera).
 
-Alternatively, you could run the console directly while executing _geth_:
+By default, Metamask will try to connect to the Main network.
 
-```
-geth --identity "MyTestNetNode" --datadir ./chaindata --nodiscover --networkid 12342 console
-```
+The first step is to connect Metamask with the private Ethereum network. For that reason, on the top-left side, choose "Localhost".
 
-As it can be seen, geth provides several management APIs as for example:
+But, wait... it does not work!
+The reason is because Metamask tries to connect using RPC and the Ethereum node has it not enabled by default.
 
-* admin: Geth node management
-* debug: Geth node debugging
-* miner: Miner and DAG management
-* personal: Account management
-* txpool: Transaction pool inspection
-* web3: JS application API
+#### Enable RPC on Ethereum Node
 
-More information:
-
-* [Management APIs · ethereum/go-ethereum Wiki · GitHub](https://github.com/ethereum/go-ethereum/wiki/Management-APIs)
-* [JavaScript API · ethereum/wiki Wiki · GitHub](https://github.com/ethereum/wiki/wiki/JavaScript-API)
-
-Type for example:
+Run the Ethereum node with RPC 8545:
 
 ```
-web3.fromWei(eth.getBalance(eth.accounts[0]), "ether")
+geth --identity "MyTestNetNode" --datadir ./chaindata --nodiscover --networkid 12342 --rpc
 ```
 
-You will see that the previously configured account has been prefunded with 100 ethers.
+#### Retry to connect
+
+Connect to the localhost port 8545 (default) and discover the application by:
+
+1.  Create an account
+2.  Send ether between Mist and Metamask accounts
+
+Note: Mist must be restarted because the geth process was stopped and restarted.
 
 ## Author & Contributors
 
@@ -166,3 +178,5 @@ You will see that the previously configured account has been prefunded with 100 
 * [White Paper · ethereum/wiki Wiki · GitHub](https://github.com/ethereum/wiki/wiki/White-Paper)
 * [Ethereum Homestead Documentation — Ethereum Homestead 0.1 documentation](http://ethdocs.org/en/latest/index.html)
 * [Geth · ethereum/go-ethereum Wiki · GitHub](https://github.com/ethereum/go-ethereum/wiki/geth)
+* [GitHub - ethereum/mist: Mist. Browse and use Ðapps on the Ethereum network.](https://github.com/ethereum/mist)
+* [MetaMask](https://metamask.io/)
